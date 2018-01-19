@@ -43,6 +43,7 @@
         <config-file target="*-Info.plist" parent="NSBluetoothPeripheralUsageDescription">
             <string>$BLUETOOTH_USAGE_DESCRIPTION</string>
         </config-file>
+        <param name="onload" value="true" />
     </platform>
 
     <platform name="android">
