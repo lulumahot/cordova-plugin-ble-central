@@ -39,7 +39,7 @@
     [super pluginInitialize];
 
     peripherals = [NSMutableSet set];
-    manager = [[CBCentralManager alloc] initWithDelegate:self queue:nil];
+    manager = [[CBCentralManager alloc] initWithDelegate:self queue:nil options:@{ CBCentralManagerOptionRestoreIdentifierKey: @"CentralManagerIdentifier"}];
 
     connectCallbacks = [NSMutableDictionary new];
     connectCallbackLatches = [NSMutableDictionary new];
@@ -645,6 +645,10 @@
         [self.commandDelegate sendPluginResult:pluginResult callbackId: readRSSICallbackId];
         [readRSSICallbacks removeObjectForKey:readRSSICallbackId];
     }
+}
+
+- (void)centralManager:(CBCentralManager *)central willRestoreState:(NSDictionary *)state {
+    NSLog(@"[BLEManager] - WILL RESTORE STATE : %@", state);
 }
 
 #pragma mark - internal implemetation
