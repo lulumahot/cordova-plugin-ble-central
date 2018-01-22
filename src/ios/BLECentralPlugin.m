@@ -436,6 +436,12 @@
     NSLog(@"didConnectPeripheral");
 
     peripheral.delegate = self;
+    
+    // Register auto expiring background task
+    __block UIBackgroundTaskIdentifier bgTaskId = [UIApplication.sharedApplication beginBackgroundTaskWithExpirationHandler:^{
+        [UIApplication.sharedApplication endBackgroundTask:bgTaskId];
+        bgTaskId = UIBackgroundTaskInvalid;
+    }];
 
     // NOTE: it's inefficient to discover all services
     [peripheral discoverServices:nil];
