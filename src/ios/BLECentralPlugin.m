@@ -36,6 +36,8 @@
     NSLog(@"Cordova BLE Central Plugin");
     NSLog(@"(c)2014-2016 Don Coleman");
 
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(finishLaunching:) name:UIApplicationDidFinishLaunchingNotification object:nil];
+
     [super pluginInitialize];
 
     peripherals = [NSMutableSet set];
@@ -56,6 +58,13 @@
                        @"on", @(CBCentralManagerStatePoweredOn),
                        nil];
     readRSSICallbacks = [NSMutableDictionary new];
+    
+}
+
+- (void)finishLaunching:(NSNotification *)notification
+{
+    NSLog(@"Did finish launching with options");
+    NSLog(@"%@", notification);
 }
 
 #pragma mark - Cordova Plugin Methods
