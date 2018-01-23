@@ -664,6 +664,7 @@
 
 - (void)centralManager:(CBCentralManager *)central willRestoreState:(NSDictionary *)state {
     NSLog(@"[BLEManager] - WILL RESTORE STATE : %@", state);
+    self.manager = central;
 }
 
 #pragma mark - internal implemetation
