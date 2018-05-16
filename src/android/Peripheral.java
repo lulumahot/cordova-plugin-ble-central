@@ -39,9 +39,12 @@ public class Peripheral extends BluetoothGattCallback {
     public final static UUID CLIENT_CHARACTERISTIC_CONFIGURATION_UUID = UUIDHelper.uuidFromString("2902");
     private static final String TAG = "Peripheral";
 
+    private static final int FAKE_PERIPHERAL_RSSI = 0x7FFFFFFF;
+
     private BluetoothDevice device;
     private byte[] advertisingData;
     private int advertisingRSSI;
+    private boolean autoconnect = false;
     private boolean connected = false;
     private boolean connecting = false;
     private ConcurrentLinkedQueue<BLECommand> commandQueue = new ConcurrentLinkedQueue<BLECommand>();
@@ -52,8 +55,19 @@ public class Peripheral extends BluetoothGattCallback {
     private CallbackContext connectCallback;
     private CallbackContext readCallback;
     private CallbackContext writeCallback;
+    private Activity currentActivity;
 
     private Map<String, CallbackContext> notificationCallbacks = new HashMap<String, CallbackContext>();
+
+    public Peripheral(BluetoothDevice device) {
+
+        LOG.d(TAG, "Creating un-scanned peripheral entry for address: " + device.getAddress());
+
+        this.device = device;
+        this.advertisingRSSI = FAKE_PERIPHERAL_RSSI;
+        this.advertisingData = null;
+
+    }
 
     public Peripheral(BluetoothDevice device, int advertisingRSSI, byte[] scanRecord) {
 
@@ -63,16 +77,33 @@ public class Peripheral extends BluetoothGattCallback {
 
     }
 
-    public void connect(CallbackContext callbackContext, Activity activity) {
-        BluetoothDevice device = getDevice();
-        connecting = true;
+    private void gattConnect() {
 
-        connectCallback = callbackContext;
-        if (Build.VERSION.SDK_INT < 23) {
-            gatt = device.connectGatt(activity, false, this);
-        } else {
-            gatt = device.connectGatt(activity, false, this, BluetoothDevice.TRANSPORT_LE);
+        if (gatt != null) {
+            gatt.disconnect();
+            gatt.close();
+            gatt = null;
         }
+        connected = false;
+        connecting = true;
+        queueCleanup();
+        callbackCleanup();
+
+        BluetoothDevice device = getDevice();
+        if (Build.VERSION.SDK_INT < 23) {
+            gatt = device.connectGatt(currentActivity, autoconnect, this);
+        } else {
+            gatt = device.connectGatt(currentActivity, autoconnect, this, BluetoothDevice.TRANSPORT_LE);
+        }
+
+    }
+
+    public void connect(CallbackContext callbackContext, Activity activity, boolean auto) {
+        currentActivity = activity;
+        autoconnect = auto;
+        connectCallback = callbackContext;
+
+        gattConnect();
 
         PluginResult result = new PluginResult(PluginResult.Status.NO_RESULT);
         result.setKeepCallback(true);
@@ -80,7 +111,6 @@ public class Peripheral extends BluetoothGattCallback {
     }
 
     public void disconnect() {
-        connectCallback = null;
         connected = false;
         connecting = false;
 
@@ -89,6 +119,25 @@ public class Peripheral extends BluetoothGattCallback {
             gatt.close();
             gatt = null;
         }
+        queueCleanup();
+        callbackCleanup();
+    }
+
+    @Override
+    public void onMtuChanged(BluetoothGatt gatt, int mtu, int status) {
+        LOG.d(TAG, "mtu=" + mtu + ", status=" + status);
+        super.onMtuChanged(gatt, mtu, status);
+    }
+
+    public void requestMtu(int mtuValue) {
+        if (gatt != null) {
+            LOG.d(TAG, "requestMtu mtu=" + mtuValue);
+            gatt.requestMtu(mtuValue);
+        }
+    }
+
+    public boolean isUnscanned() {
+        return advertisingData == null;
     }
 
     public JSONObject asJSONObject()  {
@@ -98,9 +147,13 @@ public class Peripheral extends BluetoothGattCallback {
         try {
             json.put("name", device.getName());
             json.put("id", device.getAddress()); // mac address
-            json.put("advertising", byteArrayToJSON(advertisingData));
+            if (advertisingData != null) {
+                json.put("advertising", byteArrayToJSON(advertisingData));
+            }
             // TODO real RSSI if we have it, else
-            json.put("rssi", advertisingRSSI);
+            if (advertisingRSSI != FAKE_PERIPHERAL_RSSI) {
+                json.put("rssi", advertisingRSSI);
+            }
         } catch (JSONException e) { // this shouldn't happen
             e.printStackTrace();
         }
@@ -219,17 +272,17 @@ public class Peripheral extends BluetoothGattCallback {
         this.gatt = gatt;
 
         if (newState == BluetoothGatt.STATE_CONNECTED) {
-
             connected = true;
             connecting = false;
             gatt.discoverServices();
 
         } else {
-
-            if (connectCallback != null) {
-                connectCallback.error(this.asJSONObject("Peripheral Disconnected"));
+            connected = false;
+            if(autoconnect) {
+                gattConnect();
+            } else {
+                disconnect();
             }
-            disconnect();
         }
 
     }
@@ -253,16 +306,16 @@ public class Peripheral extends BluetoothGattCallback {
         super.onCharacteristicRead(gatt, characteristic, status);
         LOG.d(TAG, "onCharacteristicRead " + characteristic);
 
-        if (readCallback != null) {
+        synchronized(this) {
+            if (readCallback != null) {
+                if (status == BluetoothGatt.GATT_SUCCESS) {
+                    readCallback.success(characteristic.getValue());
+                } else {
+                    readCallback.error("Error reading " + characteristic.getUuid() + " status=" + status);
+                }
 
-            if (status == BluetoothGatt.GATT_SUCCESS) {
-                readCallback.success(characteristic.getValue());
-            } else {
-                readCallback.error("Error reading " + characteristic.getUuid() + " status=" + status);
+                readCallback = null;
             }
-
-            readCallback = null;
-
         }
 
         commandCompleted();
@@ -273,15 +326,16 @@ public class Peripheral extends BluetoothGattCallback {
         super.onCharacteristicWrite(gatt, characteristic, status);
         LOG.d(TAG, "onCharacteristicWrite " + characteristic);
 
-        if (writeCallback != null) {
+        synchronized(this) {
+            if (writeCallback != null) {
+                if (status == BluetoothGatt.GATT_SUCCESS) {
+                    writeCallback.success();
+                } else {
+                    writeCallback.error(status);
+                }
 
-            if (status == BluetoothGatt.GATT_SUCCESS) {
-                writeCallback.success();
-            } else {
-                writeCallback.error(status);
+                writeCallback = null;
             }
-
-            writeCallback = null;
         }
 
         commandCompleted();
@@ -298,15 +352,17 @@ public class Peripheral extends BluetoothGattCallback {
     @Override
     public void onReadRemoteRssi(BluetoothGatt gatt, int rssi, int status) {
         super.onReadRemoteRssi(gatt, rssi, status);
-        if (readCallback != null) {
-            if (status == BluetoothGatt.GATT_SUCCESS) {
-                updateRssi(rssi);
-                readCallback.success(rssi);
-            } else {
-                readCallback.error("Error reading RSSI status=" + status);
-            }
+        synchronized(this) {
+            if (readCallback != null) {
+                if (status == BluetoothGatt.GATT_SUCCESS) {
+                    updateRssi(rssi);
+                    readCallback.success(rssi);
+                } else {
+                    readCallback.error("Error reading RSSI status=" + status);
+                }
 
-            readCallback = null;
+                readCallback = null;
+            }
         }
         commandCompleted();
     }
@@ -455,17 +511,25 @@ public class Peripheral extends BluetoothGattCallback {
         }
 
         BluetoothGattService service = gatt.getService(serviceUUID);
+
+        if (service == null) {
+            callbackContext.error("Service " + serviceUUID + " not found.");
+            return;
+        }
+
         BluetoothGattCharacteristic characteristic = findReadableCharacteristic(service, characteristicUUID);
 
         if (characteristic == null) {
             callbackContext.error("Characteristic " + characteristicUUID + " not found.");
         } else {
-            readCallback = callbackContext;
-            if (gatt.readCharacteristic(characteristic)) {
-                success = true;
-            } else {
-                readCallback = null;
-                callbackContext.error("Read failed");
+            synchronized(this) {
+                readCallback = callbackContext;
+                if (gatt.readCharacteristic(characteristic)) {
+                    success = true;
+                } else {
+                    readCallback = null;
+                    callbackContext.error("Read failed");
+                }
             }
         }
 
@@ -484,13 +548,15 @@ public class Peripheral extends BluetoothGattCallback {
             return;
         }
 
-        readCallback = callbackContext;
+        synchronized(this) {
+            readCallback = callbackContext;
 
-        if (gatt.readRemoteRssi()) {
-            success = true;
-        } else {
-            readCallback = null;
-            callbackContext.error("Read RSSI failed");
+            if (gatt.readRemoteRssi()) {
+                success = true;
+            } else {
+                readCallback = null;
+                callbackContext.error("Read RSSI failed");
+            }
         }
 
         if (!success) {
@@ -532,6 +598,12 @@ public class Peripheral extends BluetoothGattCallback {
         }
 
         BluetoothGattService service = gatt.getService(serviceUUID);
+
+        if (service == null) {
+            callbackContext.error("Service " + serviceUUID + " not found.");
+            return;
+        }
+
         BluetoothGattCharacteristic characteristic = findWritableCharacteristic(service, characteristicUUID, writeType);
 
         if (characteristic == null) {
@@ -539,13 +611,15 @@ public class Peripheral extends BluetoothGattCallback {
         } else {
             characteristic.setValue(data);
             characteristic.setWriteType(writeType);
-            writeCallback = callbackContext;
+            synchronized(this) {
+                writeCallback = callbackContext;
 
-            if (gatt.writeCharacteristic(characteristic)) {
-                success = true;
-            } else {
-                writeCallback = null;
-                callbackContext.error("Write failed");
+                if (gatt.writeCharacteristic(characteristic)) {
+                    success = true;
+                } else {
+                    writeCallback = null;
+                    callbackContext.error("Write failed");
+                }
             }
         }
 
@@ -606,6 +680,46 @@ public class Peripheral extends BluetoothGattCallback {
     public void queueReadRSSI(CallbackContext callbackContext) {
         BLECommand command = new BLECommand(callbackContext, null, null, BLECommand.READ_RSSI);
         queueCommand(command);
+    }
+
+    private void queueCleanup() {
+        bleProcessing = false;
+        BLECommand command;
+        for (;;) {
+            command = commandQueue.poll();
+            if (command != null) {
+                command.getCallbackContext().error("Peripheral Disconnected");
+            }
+            else {
+                break;
+            }
+        }
+    }
+
+    private void callbackCleanup() {
+        synchronized(this) {
+            if (connectCallback != null && !connecting) {
+                if (autoconnect) {
+                    PluginResult result = new PluginResult(PluginResult.Status.ERROR, this.asJSONObject("Peripheral Disconnected"));
+                    result.setKeepCallback(true);
+                    connectCallback.sendPluginResult(result);
+                }
+                else {
+                    connectCallback.error(this.asJSONObject("Peripheral Disconnected"));
+                    connectCallback = null;
+                }
+            }
+            if (readCallback != null) {
+                readCallback.error(this.asJSONObject("Peripheral Disconnected"));
+                readCallback = null;
+                commandCompleted();
+            }
+            if (writeCallback != null) {
+                writeCallback.error(this.asJSONObject("Peripheral Disconnected"));
+                writeCallback = null;
+                commandCompleted();
+            }
+        }
     }
 
     // add a new command to the queue

@@ -51,7 +51,10 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
     private static final String LIST = "list";
 
     private static final String CONNECT = "connect";
+    private static final String AUTOCONNECT = "autoConnect";
     private static final String DISCONNECT = "disconnect";
+
+    private static final String REQUEST_MTU = "requestMtu";
 
     private static final String READ = "read";
     private static final String WRITE = "write";
@@ -160,10 +163,21 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
             String macAddress = args.getString(0);
             connect(callbackContext, macAddress);
 
+        } else if (action.equals(AUTOCONNECT)) {
+
+            String macAddress = args.getString(0);
+            autoConnect(callbackContext, macAddress);
+
         } else if (action.equals(DISCONNECT)) {
 
             String macAddress = args.getString(0);
             disconnect(callbackContext, macAddress);
+
+        } else if (action.equals(REQUEST_MTU)) {
+
+            String macAddress = args.getString(0);
+            int mtuValue = args.getInt(1);
+            requestMtu(callbackContext, macAddress, mtuValue);
 
         } else if (action.equals(READ)) {
 
@@ -337,12 +351,37 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
     }
 
     private void connect(CallbackContext callbackContext, String macAddress) {
+        if (!peripherals.containsKey(macAddress) && BLECentralPlugin.this.bluetoothAdapter.checkBluetoothAddress(macAddress)) {
+            BluetoothDevice device = BLECentralPlugin.this.bluetoothAdapter.getRemoteDevice(macAddress);
+            Peripheral peripheral = new Peripheral(device);
+            peripherals.put(macAddress, peripheral);
+        }
+
         Peripheral peripheral = peripherals.get(macAddress);
         if (peripheral != null) {
-            peripheral.connect(callbackContext, cordova.getActivity());
+            peripheral.connect(callbackContext, cordova.getActivity(), false);
         } else {
             callbackContext.error("Peripheral " + macAddress + " not found.");
         }
+
+    }
+
+    private void autoConnect(CallbackContext callbackContext, String macAddress) {
+        Peripheral peripheral = peripherals.get(macAddress);
+
+        // allow auto-connect to connect to devices without scanning
+        if (peripheral == null) {
+            if (BluetoothAdapter.checkBluetoothAddress(macAddress)) {
+                BluetoothDevice device = bluetoothAdapter.getRemoteDevice(macAddress);
+                peripheral = new Peripheral(device);
+                peripherals.put(device.getAddress(), peripheral);
+            } else {
+                callbackContext.error(macAddress + " is not a valid MAC address.");
+                return;
+            }
+        }
+
+        peripheral.connect(callbackContext, cordova.getActivity(), true);
 
     }
 
@@ -351,6 +390,16 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
         Peripheral peripheral = peripherals.get(macAddress);
         if (peripheral != null) {
             peripheral.disconnect();
+        }
+        callbackContext.success();
+
+    }
+
+    private void requestMtu(CallbackContext callbackContext, String macAddress, int mtuValue) {
+
+        Peripheral peripheral = peripherals.get(macAddress);
+        if (peripheral != null) {
+            peripheral.requestMtu(mtuValue);
         }
         callbackContext.success();
 
@@ -463,8 +512,10 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
             return;
         }
 
-        // ignore if currently scanning, alternately could return an error
+        // return error if already scanning
         if (bluetoothAdapter.isDiscovering()) {
+            LOG.w(TAG, "Tried to start scan while already running.");
+            callbackContext.error("Tried to start scan while already running.");
             return;
         }
 
@@ -488,7 +539,7 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
         } else {
             bluetoothAdapter.startLeScan(this);
         }
-        
+
         if (scanSeconds > 0) {
             Handler handler = new Handler();
             handler.postDelayed(new Runnable() {
@@ -512,7 +563,9 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
         // do we care about consistent order? will peripherals.values() be in order?
         for (Map.Entry<String, Peripheral> entry : peripherals.entrySet()) {
             Peripheral peripheral = entry.getValue();
-            json.put(peripheral.asJSONObject());
+            if (!peripheral.isUnscanned()) {
+                json.put(peripheral.asJSONObject());
+            }
         }
 
         PluginResult result = new PluginResult(PluginResult.Status.OK, json);
@@ -523,7 +576,7 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
     public void onLeScan(BluetoothDevice device, int rssi, byte[] scanRecord) {
 
         String address = device.getAddress();
-        boolean alreadyReported = peripherals.containsKey(address);
+        boolean alreadyReported = peripherals.containsKey(address) && !peripherals.get(address).isUnscanned();
 
         if (!alreadyReported) {
 

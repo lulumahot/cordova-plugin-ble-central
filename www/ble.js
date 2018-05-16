@@ -47,6 +47,14 @@ function convertToNativeJS(object) {
     });
 }
 
+function bleConnect(auto, device_id, success, failure) {
+    var successWrapper = function(peripheral) {
+        convertToNativeJS(peripheral);
+        success(peripheral);
+    };
+    cordova.exec(successWrapper, failure, 'BLE', ((auto) ? 'autoConnect' : 'connect'), [device_id]);
+}
+
 module.exports = {
 
     scan: function (services, seconds, success, failure) {
@@ -84,15 +92,29 @@ module.exports = {
     },
 
     connect: function (device_id, success, failure) {
-        var successWrapper = function(peripheral) {
-            convertToNativeJS(peripheral);
-            success(peripheral);
-        };
-        cordova.exec(successWrapper, failure, 'BLE', 'connect', [device_id]);
+        bleConnect(false, device_id, success, failure);
+    },
+
+    autoConnect: function (device_id, success, failure) {
+        if(cordova.platformId == "ios") {
+            var failureWrapper = function(err) {
+                failure(err);
+                if(err.errorMessage == "Peripheral Disconnected") {
+                    bleConnect(false, device_id, success, failureWrapper);
+                }
+            };
+            bleConnect(false, device_id, success, failureWrapper);
+        } else {
+            bleConnect(true, device_id, success, failure);
+        }
     },
 
     disconnect: function (device_id, success, failure) {
         cordova.exec(success, failure, 'BLE', 'disconnect', [device_id]);
+    },
+
+    requestMtu: function (device_id, mtu,  success, failure) {
+        cordova.exec(success, failure, 'BLE', 'requestMtu', [device_id, mtu]);
     },
 
     // characteristic value comes back as ArrayBuffer in the success callback
