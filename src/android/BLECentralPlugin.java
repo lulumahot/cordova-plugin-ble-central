@@ -20,6 +20,13 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothManager;
+
+import android.bluetooth.le.BluetoothLeScanner;
+import android.bluetooth.le.ScanCallback;
+import android.bluetooth.le.ScanFilter;
+import android.bluetooth.le.ScanResult;
+import android.bluetooth.le.ScanSettings;
+
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -43,7 +50,7 @@ import org.json.JSONException;
 
 import java.util.*;
 
-public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.LeScanCallback {
+public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.LeScanCallback, ScanCallback {
     // actions
     private static final String SCAN = "scan";
     private static final String START_SCAN = "startScan";
@@ -101,6 +108,11 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
     private UUID[] serviceUUIDs;
     private int scanSeconds;
 
+    //private 
+    private ArrayList<ScanFilter> filters = new ArrayList<>();
+    private BluetoothLeScanner bluetoothLeScanner;
+
+
     // Bluetooth state notification
     CallbackContext stateCallback;
     BroadcastReceiver stateReceiver;
@@ -136,22 +148,38 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
             }
             BluetoothManager bluetoothManager = (BluetoothManager) activity.getSystemService(Context.BLUETOOTH_SERVICE);
             bluetoothAdapter = bluetoothManager.getAdapter();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                bluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
+            }
         }
 
         boolean validAction = true;
 
         if (action.equals(SCAN)) {
 
-            UUID[] serviceUUIDs = parseServiceUUIDList(args.getJSONArray(0));
-            int scanSeconds = args.getInt(1);
-            resetScanOptions();
-            findLowEnergyDevices(callbackContext, serviceUUIDs, scanSeconds);
+            if(Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP){
+                UUID[] serviceUUIDs = parseServiceUUIDList(args.getJSONArray(0));
+                int scanSeconds = args.getInt(1);
+                resetScanOptions();
+                findLowEnergyDevices(callbackContext, serviceUUIDs, scanSeconds);
+            }else{
+                ArrayList<ScanFilter> filters = parseServiceUUIDListAsFilters(args.getJSONarray(0));
+                int scanSeconds = args.getInt(1);
+                resetScanOptions();
+                findLowEnergyDevicesNewWay(callbackContext, filters, scanSeconds);
+            }
 
         } else if (action.equals(START_SCAN)) {
 
-            UUID[] serviceUUIDs = parseServiceUUIDList(args.getJSONArray(0));
-            resetScanOptions();
-            findLowEnergyDevices(callbackContext, serviceUUIDs, -1);
+            if(Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP){
+                UUID[] serviceUUIDs = parseServiceUUIDList(args.getJSONArray(0));
+                resetScanOptions();
+                findLowEnergyDevices(callbackContext, serviceUUIDs, -1);
+            }else{
+                ArrayList<ScanFilter> filters = parseServiceUUIDListAsFilters(args.getJSONarray(0));
+                resetScanOptions();
+                findLowEnergyDevicesNewWay(callbackContext, filters, -1);
+            }
 
         } else if (action.equals(STOP_SCAN)) {
 
@@ -312,6 +340,19 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
         }
 
         return serviceUUIDs.toArray(new UUID[jsonArray.length()]);
+    }
+
+    private List<ScanFilter> parseServiceUUIDListAsFilters(JSONArray jsonArray) throws JSONException {
+        List<ScanFilter> filters = new ArrayList<ScanFilter>();
+
+        for(int i = 0; i < jsonArray.length(); i++){
+            String uuidString = jsonArray.getString(i);
+            filters.add(new ScanFilter.Builder()
+                    .setServiceUuid(ParcelUuid.fromString(uuidString))
+                    .build());
+        }
+
+        return filters;
     }
 
     private void onBluetoothStateChange(Intent intent) {
@@ -567,6 +608,60 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
         callbackContext.sendPluginResult(result);
     }
 
+    findLowEnergyDevicesNewWay(CallbackContext callbackContext, List<ScanFilter> filters, int scanSeconds){
+        if(!PermissionHelper.hasPermission(this, ACCESS_COARSE_LOCATION)) {
+            // save info so we can call this method again after permissions are granted
+            permissionCallback = callbackContext;
+            this.filters = filters;
+            this.scanSeconds = scanSeconds;
+            PermissionHelper.requestPermission(this, REQUEST_ACCESS_COARSE_LOCATION, ACCESS_COARSE_LOCATION);
+            return;
+        }
+
+        // return error if already scanning
+        if (bluetoothAdapter.isDiscovering()) {
+            LOG.w(TAG, "Tried to start scan while already running.");
+            callbackContext.error("Tried to start scan while already running.");
+            return;
+        }
+
+        // clear non-connected cached peripherals
+        for(Iterator<Map.Entry<String, Peripheral>> iterator = peripherals.entrySet().iterator(); iterator.hasNext(); ) {
+            Map.Entry<String, Peripheral> entry = iterator.next();
+            Peripheral device = entry.getValue();
+            boolean connecting = device.isConnecting();
+            if (connecting){
+                LOG.d(TAG, "Not removing connecting device: " + device.getDevice().getAddress());
+            }
+            if(!entry.getValue().isConnected() && !connecting) {
+                iterator.remove();
+            }
+        }
+
+        discoverCallback = callbackContext;
+        ScanSettings settings = new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).setReportDelay(0).build();
+        if (serviceUUIDs != null && serviceUUIDs.length > 0) {
+            bluetoothLeScanner.startScan(filters, settings, this);
+        } else {
+            bluetoothLeScanner.startScan(null, settings, this);
+        }
+
+        if (scanSeconds > 0) {
+            Handler handler = new Handler();
+            handler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    LOG.d(TAG, "Stopping Scan");
+                    BLECentralPlugin.this.bluetoothLeScanner.stopScan(BLECentralPlugin.this);
+                }
+            }, scanSeconds * 1000);
+        }
+
+        PluginResult result = new PluginResult(PluginResult.Status.NO_RESULT);
+        result.setKeepCallback(true);
+        callbackContext.sendPluginResult(result);
+    }
+
     private void listKnownDevices(CallbackContext callbackContext) {
 
         JSONArray json = new JSONArray();
@@ -585,7 +680,16 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
 
     @Override
     public void onLeScan(BluetoothDevice device, int rssi, byte[] scanRecord) {
+        onLeDeviceScanned(device, rssi, scanRecord);
+    }
 
+    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
+    @Override
+    public void onScanResult(int callbackType, ScanResult result) {
+        onLeDeviceScanned(result.getDevice(), result.getRssi(), (result.getScanRecord() != null) ? result.getScanRecord().getBytes() : null);
+    }
+
+    private onLeDeviceScanned(BluetoothDevice device, int rssi, byte[] scanRecord){
         String address = device.getAddress();
         boolean alreadyReported = peripherals.containsKey(address) && !peripherals.get(address).isUnscanned();
 
