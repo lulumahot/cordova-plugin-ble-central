@@ -315,12 +315,21 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
             upgradeFirmware(callbackContext, macAddress, uri);
 
         } else if (action.equals(START_SCAN_WITH_OPTIONS)) {
-            UUID[] serviceUUIDs = parseServiceUUIDList(args.getJSONArray(0));
-            JSONObject options = args.getJSONObject(1);
 
-            resetScanOptions();
-            this.reportDuplicates = options.optBoolean("reportDuplicates", false);
-            findLowEnergyDevices(callbackContext, serviceUUIDs, -1);
+            if(Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP){
+                UUID[] serviceUUIDs = parseServiceUUIDList(args.getJSONArray(0));
+                JSONObject options = args.getJSONObject(1);
+
+                resetScanOptions();
+                this.reportDuplicates = options.optBoolean("reportDuplicates", false);
+                findLowEnergyDevices(callbackContext, serviceUUIDs, -1);
+            }else{
+                ArrayList<ScanFilter> filters = parseServiceUUIDListAsFilters(args.getJSONarray(0));
+                JSONObject options = args.getJSONObject(1);
+                resetScanOptions();
+                this.reportDuplicates = options.optBoolean("reportDuplicates", false);
+                findLowEnergyDevicesNewWay(callbackContext, filters, -1);
+            }
 
         } else {
 
