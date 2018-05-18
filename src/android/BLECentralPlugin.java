@@ -333,7 +333,7 @@ public class BLECentralPlugin extends CordovaPlugin  implements BluetoothAdapter
             }else{
 
                 LOG.d(TAG, "New ble handling");
-                ArrayList<ScanFilter> filters = parseServiceUUIDListAsFilters(args.getJSONarray(0));
+                ArrayList<ScanFilter> filters = parseServiceUUIDListAsFilters(args.getJSONArray(0));
                 JSONObject options = args.getJSONObject(1);
                 resetScanOptions();
                 this.reportDuplicates = options.optBoolean("reportDuplicates", false);
