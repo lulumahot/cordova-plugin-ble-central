@@ -54,7 +54,7 @@ import org.json.JSONException;
 
 import java.util.*;
 
-public class BLECentralPlugin extends CordovaPlugin, ScanCallback  implements BluetoothAdapter.LeScanCallback{
+public class BLECentralPlugin extends CordovaPlugin  implements BluetoothAdapter.LeScanCallback{
     // actions
     private static final String SCAN = "scan";
     private static final String START_SCAN = "startScan";
@@ -659,10 +659,17 @@ public class BLECentralPlugin extends CordovaPlugin, ScanCallback  implements Bl
 
         discoverCallback = callbackContext;
         ScanSettings settings = new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).setReportDelay(0).build();
+        ScanCallback scanCallback = new ScanCallback() {
+                @TargetApi(Build.VERSION_CODES.LOLLIPOP)
+                @Override
+                public void onScanResult(int callbackType, ScanResult result) {
+                    onLeDeviceScanned(result.getDevice(), result.getRssi(), (result.getScanRecord() != null) ? result.getScanRecord().getBytes() : null);
+                }
+            };
         if (serviceUUIDs != null && serviceUUIDs.length > 0) {
-            bluetoothLeScanner.startScan(filters, settings, this);
+            bluetoothLeScanner.startScan(filters, settings, scanCallback);
         } else {
-            bluetoothLeScanner.startScan(null, settings, this);
+            bluetoothLeScanner.startScan(null, settings, scanCallback);
         }
 
         if (scanSeconds > 0) {
@@ -671,7 +678,7 @@ public class BLECentralPlugin extends CordovaPlugin, ScanCallback  implements Bl
                 @Override
                 public void run() {
                     LOG.d(TAG, "Stopping Scan");
-                    BLECentralPlugin.this.bluetoothLeScanner.stopScan(BLECentralPlugin.this);
+                    BLECentralPlugin.this.bluetoothLeScanner.stopScan(scanCallback);
                 }
             }, scanSeconds * 1000);
         }
@@ -700,11 +707,6 @@ public class BLECentralPlugin extends CordovaPlugin, ScanCallback  implements Bl
     @Override
     public void onLeScan(BluetoothDevice device, int rssi, byte[] scanRecord) {
         onLeDeviceScanned(device, rssi, scanRecord);
-    }
-
-    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-    public void onScanResult(int callbackType, ScanResult result) {
-        onLeDeviceScanned(result.getDevice(), result.getRssi(), (result.getScanRecord() != null) ? result.getScanRecord().getBytes() : null);
     }
 
     private void onLeDeviceScanned(BluetoothDevice device, int rssi, byte[] scanRecord){
