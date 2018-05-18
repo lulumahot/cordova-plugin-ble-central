@@ -109,7 +109,7 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
     private int scanSeconds;
 
     //private 
-    private ArrayList<ScanFilter> filters = new ArrayList<>();
+    private ArrayList<ScanFilter> filters = new ArrayList();
     private BluetoothLeScanner bluetoothLeScanner;
 
 
@@ -319,7 +319,7 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
             LOG.d(TAG, "Android version " + Build.VERSION.SDK_INT);
             if(Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP){
                 
-                Log.d(TAG, "Old ble handling");
+                LOG.d(TAG, "Old ble handling");
                 UUID[] serviceUUIDs = parseServiceUUIDList(args.getJSONArray(0));
                 JSONObject options = args.getJSONObject(1);
                 resetScanOptions();
@@ -328,7 +328,7 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
 
             }else{
 
-                Log.d(TAG, "New ble handling");
+                LOG.d(TAG, "New ble handling");
                 ArrayList<ScanFilter> filters = parseServiceUUIDListAsFilters(args.getJSONarray(0));
                 JSONObject options = args.getJSONObject(1);
                 resetScanOptions();
@@ -623,7 +623,7 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
         callbackContext.sendPluginResult(result);
     }
 
-    findLowEnergyDevicesNewWay(CallbackContext callbackContext, List<ScanFilter> filters, int scanSeconds){
+    private void findLowEnergyDevicesNewWay(CallbackContext callbackContext, List<ScanFilter> filters, int scanSeconds){
         if(!PermissionHelper.hasPermission(this, ACCESS_COARSE_LOCATION)) {
             // save info so we can call this method again after permissions are granted
             permissionCallback = callbackContext;
@@ -704,7 +704,7 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
         onLeDeviceScanned(result.getDevice(), result.getRssi(), (result.getScanRecord() != null) ? result.getScanRecord().getBytes() : null);
     }
 
-    private onLeDeviceScanned(BluetoothDevice device, int rssi, byte[] scanRecord){
+    private void onLeDeviceScanned(BluetoothDevice device, int rssi, byte[] scanRecord){
         String address = device.getAddress();
         boolean alreadyReported = peripherals.containsKey(address) && !peripherals.get(address).isUnscanned();
 

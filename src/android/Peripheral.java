@@ -731,6 +731,8 @@ public class Peripheral extends BluetoothGattCallback {
                 commandCompleted();
             }
         }
+    }
+    
     public void upgradeFirmware(CallbackContext callbackContext, Uri uri) {
         dfuCallback = callbackContext;
 
