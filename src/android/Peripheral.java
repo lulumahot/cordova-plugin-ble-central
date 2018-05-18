@@ -160,6 +160,8 @@ public class Peripheral extends BluetoothGattCallback {
             json.put("id", device.getAddress()); // mac address
             if (advertisingData != null) {
                 json.put("advertising", byteArrayToJSON(advertisingData));
+            }else{
+                json.put("bullshit", "That's bullshit !");
             }
             // TODO real RSSI if we have it, else
             if (advertisingRSSI != FAKE_PERIPHERAL_RSSI) {
