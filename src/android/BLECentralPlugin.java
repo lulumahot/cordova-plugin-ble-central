@@ -361,7 +361,7 @@ public class BLECentralPlugin extends CordovaPlugin  implements BluetoothAdapter
         return serviceUUIDs.toArray(new UUID[jsonArray.length()]);
     }
 
-    private List<ScanFilter> parseServiceUUIDListAsFilters(JSONArray jsonArray) throws JSONException {
+    private ArrayList<ScanFilter> parseServiceUUIDListAsFilters(JSONArray jsonArray) throws JSONException {
         ArrayList<ScanFilter> filters = new ArrayList<ScanFilter>();
 
         for(int i = 0; i < jsonArray.length(); i++){
