@@ -26,6 +26,10 @@ import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
+import android.annotation.TargetApi;
+import android.os.ParcelUuid;
+
+
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -50,7 +54,7 @@ import org.json.JSONException;
 
 import java.util.*;
 
-public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.LeScanCallback, ScanCallback {
+public class BLECentralPlugin extends CordovaPlugin, ScanCallback  implements BluetoothAdapter.LeScanCallback{
     // actions
     private static final String SCAN = "scan";
     private static final String START_SCAN = "startScan";
@@ -149,7 +153,7 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
             BluetoothManager bluetoothManager = (BluetoothManager) activity.getSystemService(Context.BLUETOOTH_SERVICE);
             bluetoothAdapter = bluetoothManager.getAdapter();
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                bluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
+                bluetoothLeScanner = bluetoothAdapter.getBluetoothLeScanner();
             }
         }
 
@@ -358,7 +362,7 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
     }
 
     private List<ScanFilter> parseServiceUUIDListAsFilters(JSONArray jsonArray) throws JSONException {
-        List<ScanFilter> filters = new ArrayList<ScanFilter>();
+        ArrayList<ScanFilter> filters = new ArrayList<ScanFilter>();
 
         for(int i = 0; i < jsonArray.length(); i++){
             String uuidString = jsonArray.getString(i);
@@ -623,7 +627,7 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
         callbackContext.sendPluginResult(result);
     }
 
-    private void findLowEnergyDevicesNewWay(CallbackContext callbackContext, List<ScanFilter> filters, int scanSeconds){
+    private void findLowEnergyDevicesNewWay(CallbackContext callbackContext, ArrayList<ScanFilter> filters, int scanSeconds){
         if(!PermissionHelper.hasPermission(this, ACCESS_COARSE_LOCATION)) {
             // save info so we can call this method again after permissions are granted
             permissionCallback = callbackContext;
@@ -699,7 +703,6 @@ public class BLECentralPlugin extends CordovaPlugin implements BluetoothAdapter.
     }
 
     @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-    @Override
     public void onScanResult(int callbackType, ScanResult result) {
         onLeDeviceScanned(result.getDevice(), result.getRssi(), (result.getScanRecord() != null) ? result.getScanRecord().getBytes() : null);
     }
