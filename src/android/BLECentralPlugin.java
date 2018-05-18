@@ -167,7 +167,7 @@ public class BLECentralPlugin extends CordovaPlugin  implements BluetoothAdapter
                 resetScanOptions();
                 findLowEnergyDevices(callbackContext, serviceUUIDs, scanSeconds);
             }else{
-                ArrayList<ScanFilter> filters = parseServiceUUIDListAsFilters(args.getJSONarray(0));
+                ArrayList<ScanFilter> filters = parseServiceUUIDListAsFilters(args.getJSONArray(0));
                 int scanSeconds = args.getInt(1);
                 resetScanOptions();
                 findLowEnergyDevicesNewWay(callbackContext, filters, scanSeconds);
@@ -180,7 +180,7 @@ public class BLECentralPlugin extends CordovaPlugin  implements BluetoothAdapter
                 resetScanOptions();
                 findLowEnergyDevices(callbackContext, serviceUUIDs, -1);
             }else{
-                ArrayList<ScanFilter> filters = parseServiceUUIDListAsFilters(args.getJSONarray(0));
+                ArrayList<ScanFilter> filters = parseServiceUUIDListAsFilters(args.getJSONArray(0));
                 resetScanOptions();
                 findLowEnergyDevicesNewWay(callbackContext, filters, -1);
             }
