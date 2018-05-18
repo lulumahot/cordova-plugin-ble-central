@@ -659,13 +659,13 @@ public class BLECentralPlugin extends CordovaPlugin  implements BluetoothAdapter
 
         discoverCallback = callbackContext;
         ScanSettings settings = new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).setReportDelay(0).build();
-        ScanCallback scanCallback = new ScanCallback() {
-                @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-                @Override
-                public void onScanResult(int callbackType, ScanResult result) {
-                    onLeDeviceScanned(result.getDevice(), result.getRssi(), (result.getScanRecord() != null) ? result.getScanRecord().getBytes() : null);
-                }
-            };
+        final ScanCallback scanCallback = new ScanCallback() {
+            @TargetApi(Build.VERSION_CODES.LOLLIPOP)
+            @Override
+            public void onScanResult(int callbackType, ScanResult result) {
+                onLeDeviceScanned(result.getDevice(), result.getRssi(), (result.getScanRecord() != null) ? result.getScanRecord().getBytes() : null);
+            }
+        };
         if (serviceUUIDs != null && serviceUUIDs.length > 0) {
             bluetoothLeScanner.startScan(filters, settings, scanCallback);
         } else {
