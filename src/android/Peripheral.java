@@ -156,6 +156,7 @@ public class Peripheral extends BluetoothGattCallback {
         JSONObject json = new JSONObject();
 
         try {
+            json.put("test", "test");
             json.put("name", device.getName());
             json.put("id", device.getAddress()); // mac address
             if (advertisingData != null) {
