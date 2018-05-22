@@ -224,9 +224,9 @@ public class Peripheral extends BluetoothGattCallback {
         JSONObject result = new JSONObject();
         try {
             result.put("UUIDs", uuids);
-            result.put("ManufacturerData", MfgData);
+            result.put("manufacturerData", MfgData);
             if(serviceData != null && serviceData.length > 0){
-                result.put("ServiceData", serviceData[0] == 1);
+                result.put("serviceData", serviceData[0] == 1);
             }
         } catch (JSONException e) { // this shouldn't happen
             e.printStackTrace();
