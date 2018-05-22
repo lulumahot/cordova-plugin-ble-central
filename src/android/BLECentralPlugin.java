@@ -337,9 +337,9 @@ public class BLECentralPlugin extends CordovaPlugin  implements BluetoothAdapter
                 JSONObject options = args.getJSONObject(1);
                 resetScanOptions();
                 this.reportDuplicates = options.optBoolean("reportDuplicates", false);
-                //UUID[] serviceUUIDs = parseServiceUUIDList(args.getJSONArray(0));
-                //findLowEnergyDevices(callbackContext, serviceUUIDs, -1);
-                findLowEnergyDevicesNewWay(callbackContext, filters, -1);
+                UUID[] serviceUUIDs = parseServiceUUIDList(args.getJSONArray(0));
+                findLowEnergyDevices(callbackContext, serviceUUIDs, -1);
+                //findLowEnergyDevicesNewWay(callbackContext, filters, -1);
 
             }
 
@@ -739,7 +739,7 @@ public class BLECentralPlugin extends CordovaPlugin  implements BluetoothAdapter
             if (reportDuplicates && discoverCallback != null) {
                 JSONObject json = peripheral.asJSONObject();
                 try {
-                    json.put("changed", "changed");
+                    json.put("changed2", "changed");
                     json.put("name3", device.getName());
                 }catch (JSONException e) { // this shouldn't happen
                     e.printStackTrace();
