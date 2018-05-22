@@ -115,7 +115,7 @@ public class BLECentralPlugin extends CordovaPlugin  implements BluetoothAdapter
     //private 
     private ArrayList<ScanFilter> filters = new ArrayList();
     private BluetoothLeScanner bluetoothLeScanner;
-    private final ScanCallback scanCallback;
+    private ScanCallback scanCallback;
 
 
     // Bluetooth state notification
@@ -679,11 +679,12 @@ public class BLECentralPlugin extends CordovaPlugin  implements BluetoothAdapter
 
         if (scanSeconds > 0) {
             Handler handler = new Handler();
+            final ScanCallback sc = scanCallback;
             handler.postDelayed(new Runnable() {
                 @Override
                 public void run() {
                     LOG.d(TAG, "Stopping Scan");
-                    BLECentralPlugin.this.bluetoothLeScanner.stopScan(scanCallback);
+                    BLECentralPlugin.this.bluetoothLeScanner.stopScan(sc);
                 }
             }, scanSeconds * 1000);
         }
