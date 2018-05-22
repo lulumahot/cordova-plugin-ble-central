@@ -147,6 +147,89 @@ public class Peripheral extends BluetoothGattCallback {
         }
     }
 
+    public JSONObject parseAdvertisementPacket(final byte[] scanRecord) {
+        byte[] advertisedData = Arrays.copyOf(scanRecord, scanRecord.length);
+        JSONArray uuids = new JSONArray();
+        byte[] MfgData = null;
+        byte[] serviceData = null;
+        int i;
+
+        int offset = 0;
+        while (offset < (advertisedData.length - 2)) {
+            int len = advertisedData[offset++];
+            if (len == 0)
+                break;
+
+            int type = advertisedData[offset++];
+            switch (type & 0xFF) {
+                case 0x02: // Partial list of 16-bit UUIDs
+                case 0x03: // Complete list of 16-bit UUIDs
+                    while (len > 1) {
+                        int uuid16 = advertisedData[offset++] & 0xFF;
+                        uuid16 |= (advertisedData[offset++] << 8);
+                        len -= 2;
+                        uuids.put(String.format(
+                                "%08x-0000-1000-8000-00805f9b34fb", uuid16));
+                    }
+                    break;
+                case 0x06:// Partial list of 128-bit UUIDs
+                case 0x07:// Complete list of 128-bit UUIDs
+                    // Loop through the advertised 128-bit UUID's.
+                    while (len >= 16) {
+                        try {
+                            // Wrap the advertised bits and order them.
+                            ByteBuffer buffer = ByteBuffer.wrap(advertisedData,
+                                    offset++, 16).order(ByteOrder.LITTLE_ENDIAN);
+                            long mostSignificantBit = buffer.getLong();
+                            long leastSignificantBit = buffer.getLong();
+                            uuids.put(new UUID(leastSignificantBit,
+                                    mostSignificantBit).toString()));
+                        } catch (IndexOutOfBoundsException e) {
+                            // Defensive programming.
+                            Log.e("BleDeviceF.parseUUID", e.toString());
+                        } finally {
+                            // Move the offset to read the next uuid.
+                            offset += 15;
+                            len -= 16;
+                        }
+                    }
+                    break;
+                case 0xFF:  // Manufacturer Specific Data
+                    MfgData = new byte[len];
+                    i = 0;
+                    while (len > 1) {
+                        if (i < 32) {
+                            MfgData[i++] = advertisedData[offset++];
+                        }
+                        len -= 1;
+                    }
+                    break;
+                case 0x16: // Service Data
+                    serviceData = new byte[len];
+                    i = 0;
+                    offset += 2;
+                    while(len - 2 > 1){
+                        serviceData[i++] = advertisedData[offset++];
+                        len -= 1;
+                    }
+
+                    break;
+                default:
+                    offset += (len - 1);
+                    break;
+            }
+        }
+        JSONObject result = new JSONObject();
+        try {
+            result.put("UUIDs", uuids);
+            result.put("ManufacturerData", MfgData);
+            result.put("ServiceData", serviceData[0] == 1);
+        } catch (JSONException e) { // this shouldn't happen
+            e.printStackTrace();
+        }
+        return result;
+    }
+
     public boolean isUnscanned() {
         return advertisingData == null;
     }
@@ -156,12 +239,11 @@ public class Peripheral extends BluetoothGattCallback {
         JSONObject json = new JSONObject();
 
         try {
-            json.put("test", "test");
             json.put("name", device.getName());
-            json.put("nametest", "nametest");
             json.put("id", device.getAddress()); // mac address
             if (advertisingData != null) {
-                json.put("advertising", byteArrayToJSON(advertisingData));
+                //json.put("advertising", byteArrayToJSON(advertisingData));
+                json.put("advertising", parseAdvertisementPacket(advertisingData));
             }else{
                 json.put("bullshit", "That's bullshit !");
             }
