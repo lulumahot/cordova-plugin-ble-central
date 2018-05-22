@@ -226,7 +226,7 @@ public class Peripheral extends BluetoothGattCallback {
         try {
             result.put("UUIDs", uuids);
             result.put("ManufacturerData", MfgData);
-            if(serviceData != null && serviceData.length() > 0){
+            if(serviceData != null && serviceData.length > 0){
                 result.put("ServiceData", serviceData[0] == 1);
             }
         } catch (JSONException e) { // this shouldn't happen
