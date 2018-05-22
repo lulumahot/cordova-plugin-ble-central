@@ -215,7 +215,6 @@ public class Peripheral extends BluetoothGattCallback {
                         serviceData[i++] = advertisedData[offset++];
                         len -= 1;
                     }
-
                     break;
                 default:
                     offset += (len - 1);
