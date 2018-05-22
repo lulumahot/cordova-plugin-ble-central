@@ -666,7 +666,7 @@ public class BLECentralPlugin extends CordovaPlugin  implements BluetoothAdapter
                 onLeDeviceScanned(result.getDevice(), result.getRssi(), (result.getScanRecord() != null) ? result.getScanRecord().getBytes() : null);
             }
         };
-        if (serviceUUIDs != null && serviceUUIDs.length > 0) {
+        if (filters != null && filters.size() > 0) {
             bluetoothLeScanner.startScan(filters, settings, scanCallback);
         } else {
             bluetoothLeScanner.startScan(null, settings, scanCallback);
@@ -719,14 +719,7 @@ public class BLECentralPlugin extends CordovaPlugin  implements BluetoothAdapter
             peripherals.put(device.getAddress(), peripheral);
 
             if (discoverCallback != null) {
-                JSONObject json = peripheral.asJSONObject();
-                try {
-                    json.put("changed", "changed");
-                    json.put("name2", device.getName());
-                }catch (JSONException e) { // this shouldn't happen
-                    e.printStackTrace();
-                }   
-                PluginResult result = new PluginResult(PluginResult.Status.OK, json);
+                PluginResult result = new PluginResult(PluginResult.Status.OK, peripheral.asJSONObject());
                 result.setKeepCallback(true);
                 discoverCallback.sendPluginResult(result);
             }
@@ -735,14 +728,7 @@ public class BLECentralPlugin extends CordovaPlugin  implements BluetoothAdapter
             Peripheral peripheral = peripherals.get(address);
             peripheral.update(rssi, scanRecord);
             if (reportDuplicates && discoverCallback != null) {
-                JSONObject json = peripheral.asJSONObject();
-                try {
-                    json.put("changed2", "changed");
-                    json.put("name3", device.getName());
-                }catch (JSONException e) { // this shouldn't happen
-                    e.printStackTrace();
-                }  
-                PluginResult result = new PluginResult(PluginResult.Status.OK, json);
+                PluginResult result = new PluginResult(PluginResult.Status.OK, peripheral.asJSONObject());
                 result.setKeepCallback(true);
                 discoverCallback.sendPluginResult(result);
             }
