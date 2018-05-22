@@ -183,7 +183,7 @@ public class Peripheral extends BluetoothGattCallback {
                             long mostSignificantBit = buffer.getLong();
                             long leastSignificantBit = buffer.getLong();
                             uuids.put(new UUID(leastSignificantBit,
-                                    mostSignificantBit).toString()));
+                                    mostSignificantBit).toString());
                         } catch (IndexOutOfBoundsException e) {
                             // Defensive programming.
                             Log.e("BleDeviceF.parseUUID", e.toString());
