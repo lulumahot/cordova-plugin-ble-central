@@ -115,6 +115,7 @@ public class BLECentralPlugin extends CordovaPlugin  implements BluetoothAdapter
     //private 
     private ArrayList<ScanFilter> filters = new ArrayList();
     private BluetoothLeScanner bluetoothLeScanner;
+    private final ScanCallback scanCallback;
 
 
     // Bluetooth state notification
@@ -154,6 +155,13 @@ public class BLECentralPlugin extends CordovaPlugin  implements BluetoothAdapter
             bluetoothAdapter = bluetoothManager.getAdapter();
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 bluetoothLeScanner = bluetoothAdapter.getBluetoothLeScanner();
+                scanCallback = new ScanCallback() {
+                    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
+                    @Override
+                    public void onScanResult(int callbackType, ScanResult result) {
+                        onLeDeviceScanned(result.getDevice(), result.getRssi(), (result.getScanRecord() != null) ? result.getScanRecord().getBytes() : null);
+                    }
+                };
             }
         }
 
@@ -187,7 +195,11 @@ public class BLECentralPlugin extends CordovaPlugin  implements BluetoothAdapter
 
         } else if (action.equals(STOP_SCAN)) {
 
-            bluetoothAdapter.stopLeScan(this);
+            if(Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP){
+                bluetoothAdapter.stopLeScan(this);
+            } else {
+                bluetoothLeScanner.stopScan(scanCallback);
+            }
             callbackContext.success();
 
         } else if (action.equals(LIST)) {
@@ -659,13 +671,6 @@ public class BLECentralPlugin extends CordovaPlugin  implements BluetoothAdapter
 
         discoverCallback = callbackContext;
         ScanSettings settings = new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).setReportDelay(0).build();
-        final ScanCallback scanCallback = new ScanCallback() {
-            @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-            @Override
-            public void onScanResult(int callbackType, ScanResult result) {
-                onLeDeviceScanned(result.getDevice(), result.getRssi(), (result.getScanRecord() != null) ? result.getScanRecord().getBytes() : null);
-            }
-        };
         if (filters != null && filters.size() > 0) {
             bluetoothLeScanner.startScan(filters, settings, scanCallback);
         } else {
