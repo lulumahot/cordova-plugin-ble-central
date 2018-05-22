@@ -722,8 +722,12 @@ public class BLECentralPlugin extends CordovaPlugin  implements BluetoothAdapter
 
             if (discoverCallback != null) {
                 JSONObject json = peripheral.asJSONObject();
-                json.put("changed", "changed");
-                json.put("name2", device.getName());
+                try {
+                    json.put("changed", "changed");
+                    json.put("name2", device.getName());
+                }catch (JSONException e) { // this shouldn't happen
+                    e.printStackTrace();
+                }   
                 PluginResult result = new PluginResult(PluginResult.Status.OK, json);
                 result.setKeepCallback(true);
                 discoverCallback.sendPluginResult(result);
