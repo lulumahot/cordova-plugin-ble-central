@@ -65,7 +65,6 @@ public class Peripheral extends BluetoothGattCallback {
     private CallbackContext connectCallback;
     private CallbackContext readCallback;
     private CallbackContext writeCallback;
-    private Activity currentActivity;
 
     private Map<String, CallbackContext> notificationCallbacks = new HashMap<String, CallbackContext>();
     private CallbackContext dfuCallback;
@@ -105,15 +104,15 @@ public class Peripheral extends BluetoothGattCallback {
 
         BluetoothDevice device = getDevice();
         if (Build.VERSION.SDK_INT < 23) {
-            gatt = device.connectGatt(currentActivity, autoconnect, this);
+            gatt = device.connectGatt(activity, autoconnect, this);
         } else {
-            gatt = device.connectGatt(currentActivity, autoconnect, this, BluetoothDevice.TRANSPORT_LE);
+            gatt = device.connectGatt(activity, autoconnect, this, BluetoothDevice.TRANSPORT_LE);
         }
 
     }
 
     public void connect(CallbackContext callbackContext, Activity activity, boolean auto) {
-        currentActivity = activity;
+        this.activity = activity;
         autoconnect = auto;
         connectCallback = callbackContext;
 
