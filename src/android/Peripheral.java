@@ -834,7 +834,7 @@ public class Peripheral extends BluetoothGattCallback {
 
         // set the ZIP and start the process
         starter.setZip(uri);
-        starter.start(activity, DfuService.class);
+        starter.start(getApplicationContext(), DfuService.class);
 
         PluginResult result = new PluginResult(PluginResult.Status.NO_RESULT);
         result.setKeepCallback(true);
