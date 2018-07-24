@@ -140,7 +140,7 @@ public class BLECentralPlugin extends CordovaPlugin  implements BluetoothAdapter
     public boolean execute(String action, CordovaArgs args, CallbackContext callbackContext) throws JSONException {
         LOG.d(TAG, "action = " + action);
 
-        if (bluetoothAdapter == null) {
+        if (bluetoothAdapter == null || bluetoothLeScanner == null) {
             Activity activity = cordova.getActivity();
             boolean hardwareSupportsBLE = activity.getApplicationContext()
                                             .getPackageManager()
