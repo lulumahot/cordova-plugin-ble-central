@@ -107,8 +107,6 @@ static NSDictionary *dataToArrayBuffer(NSData* data) {
     // Convert to String keys with Array Buffer values
     NSMutableDictionary *serviceData = [dict objectForKey:CBAdvertisementDataServiceDataKey];
     if (serviceData) {
-        NSLog(@"%@", serviceData);
-
         for (CBUUID *key in [serviceData allKeys]) {
             [serviceData setObject:dataToArrayBuffer([serviceData objectForKey:key]) forKey:[key UUIDString]];
             [serviceData removeObjectForKey:key];
